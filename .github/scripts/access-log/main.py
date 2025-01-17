@@ -90,7 +90,6 @@ def main():
 
         try:
             response = client.search(body=query, index=INDEX)
-            scroll_id = response['_scroll_id']
             for src in response['hits']['hits']:
                 hit = src['_source']
                 timestamp = hit.get('@timestamp', 'N/A')
