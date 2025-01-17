@@ -23,6 +23,6 @@ jobs:
         cache: 'pip'
     - run: pip install -r .github/scripts/access-log/requirements.txt
     - run: python .github/scripts/access-log/main.py
-    uses: stefanzweifel/git-auto-commit-action@v4
+    - uses: stefanzweifel/git-auto-commit-action@v4
 
 
