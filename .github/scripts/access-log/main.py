@@ -90,6 +90,8 @@ def main():
 
         try:
             response = client.search(body=query, index=INDEX, scroll='1m')
+            print(f"Response hits: {len(response['hits']['hits'])}")  # Debugging line
+
             scroll_id = response['_scroll_id']
             while True:
                 response = client.scroll(scroll_id=scroll_id, scroll='1m')
@@ -111,6 +113,7 @@ def main():
             pass
 
         except Exception as err:
+            print(f"Error: {err}")
             if hasattr(err, 'info') and isinstance(err.info, dict):
                 print_error(err.info)
             else:
