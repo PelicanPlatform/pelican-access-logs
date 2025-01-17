@@ -103,7 +103,7 @@ def main():
                     read = str(hit.get('read', 'N/A'))
                     write = str(hit.get('write', 'N/A'))
     
-                    file.write(f"[{timestamp}] [Objectname:{filename}] [Host:{host}] [Read:{read}] [Write:{write}]")
+                    f.write(f"[{timestamp}] [Objectname:{filename}] [Host:{host}] [Read:{read}] [Write:{write}]")
 
 
 
