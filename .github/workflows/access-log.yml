@@ -1,0 +1,28 @@
+# Runs the python script to create the access log for the database
+
+name: Access Log
+
+on:
+  schedule:
+    # Runs at midnight (00:00) UTC every Sunday
+    - cron: "0 0 * * SUN"
+  
+  # Allow manual triggering via GitHub UI
+  workflow_dispatch:
+
+jobs:
+  accesses:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.9'
+        cache: 'pip'
+    - run: pip install -r .github/scripts/access-log/requirements.txt
+    - run: python .github/scripts/access-log/main.py
+    uses: stefanzweifel/git-auto-commit-action@v4
+
+
