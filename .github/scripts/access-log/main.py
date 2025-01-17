@@ -95,6 +95,7 @@ def main():
             scroll_id = response['_scroll_id']
             while True:
                 response = client.scroll(scroll_id=scroll_id, scroll='1m')
+                print(f"Response hits: {len(response['hits']['hits'])}") 
                 if not response['hits']['hits']:
                     break
                 for src in response['hits']['hits']:
