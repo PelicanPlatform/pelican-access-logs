@@ -89,24 +89,17 @@ def main():
 
 
         try:
-            response = client.search(body=query, index=INDEX, scroll='1m')
-            print(f"Response hits: {len(response['hits']['hits'])}")  # Debugging line
-
+            response = client.search(body=query, index=INDEX)
             scroll_id = response['_scroll_id']
-            while True:
-                response = client.scroll(scroll_id=scroll_id, scroll='1m')
-                print(f"Response hits: {len(response['hits']['hits'])}") 
-                if not response['hits']['hits']:
-                    break
-                for src in response['hits']['hits']:
-                    hit = src['_source']
-                    timestamp = hit.get('@timestamp', 'N/A')
-                    filename = hit.get('filename', 'N/A')
-                    host = hit.get('host', 'N/A')
-                    read = str(hit.get('read', 'N/A'))
-                    write = str(hit.get('write', 'N/A'))
+            for src in response['hits']['hits']:
+                hit = src['_source']
+                timestamp = hit.get('@timestamp', 'N/A')
+                filename = hit.get('filename', 'N/A')
+                host = hit.get('host', 'N/A')
+                read = str(hit.get('read', 'N/A'))
+                write = str(hit.get('write', 'N/A'))
     
-                    f.write(f"[{timestamp}] [Objectname:{filename}] [Host:{host}] [Read:{read}] [Write:{write}]")
+                f.write(f"[{timestamp}] [Objectname:{filename}] [Host:{host}] [Read:{read}] [Write:{write}]")
 
 
 
