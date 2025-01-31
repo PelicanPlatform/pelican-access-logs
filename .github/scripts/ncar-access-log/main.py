@@ -65,10 +65,10 @@ query = {
 
 def convert_ipv6_to_ipv4(ipv6_str):
     try:
-    
+
         # Convert the string to an IPv6 address object
         ipv6 = ipaddress.IPv6Address(ipv6_str)
-        
+
         # Check if it's an embedded IPv4 address
         if ipv6.ipv4_mapped:
             return str(ipv6.ipv4_mapped)  # Return the embedded IPv4 address
