@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import date
+import ipaddress
 
 from opensearchpy import OpenSearch
 
@@ -6,7 +7,7 @@ TIMEOUT = 300
 
 HOST = "https://gracc.opensciencegrid.org/q"
 INDEX = "xrd-stash*"
-DATA_PATH = "access-log"
+DATA_PATH = "ncar-access-log"
 
 query = {
     "size": 10000,
@@ -62,6 +63,20 @@ query = {
     },
 }
 
+def convert_ipv6_to_ipv4(ipv6_str):
+    try:
+    
+        # Convert the string to an IPv6 address object
+        ipv6 = ipaddress.IPv6Address(ipv6_str)
+        
+        # Check if it's an embedded IPv4 address
+        if ipv6.ipv4_mapped:
+            return str(ipv6.ipv4_mapped)  # Return the embedded IPv4 address
+        else:
+            return None  # Not an IPv6 address with an embedded IPv4 address
+    except ValueError:
+        return None  # Invalid IPv6 address
+
 
 def print_error(d, depth=0):
     pre = depth*"\t"
@@ -81,11 +96,14 @@ def print_error(d, depth=0):
         else:
             print(f"{pre}{k}:\t{v}")
 
+def write_to_files(files, content):
+    for f in files:
+        f.write(content)
 
 def main():
     client = OpenSearch(hosts=[HOST], request_timeout=TIMEOUT,)
     
-    with open(f"{DATA_PATH}/latest.log", "w") as f:
+    with open(f"{DATA_PATH}/latest.log", "w") as f1, open(f"{DATA_PATH}/{date.today()}.log", "w") as f2:
 
 
         try:
@@ -94,11 +112,17 @@ def main():
                 hit = src['_source']
                 timestamp = hit.get('@timestamp', 'N/A')
                 filename = hit.get('filename', 'N/A')
-                host = hit.get('host', 'N/A')
+                ipv6host = hit.get('host', 'N/A')
+                host = convert_ipv6_to_ipv4(ipv6host)
+                if host == None:
+                    host = 'N/A'
+
                 read = str(hit.get('read', 'N/A'))
                 write = str(hit.get('write', 'N/A'))
     
-                f.write(f"[{timestamp}] [Objectname:{filename}] [Host:{host}] [Read:{read}] [Write:{write}]\n")
+                content = f"[{timestamp}] [Objectname:{filename}] [Host:{host}] [Read:{read}] [Write:{write}]\n"
+
+                write_to_files([f1, f2], content)
 
 
 
