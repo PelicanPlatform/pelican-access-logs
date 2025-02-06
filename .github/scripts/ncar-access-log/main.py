@@ -11,7 +11,7 @@ DATA_PATH = "ncar-access-log"
 
 query = {
     "size": 10000,
-    "_source": ["@timestamp", "filename", "host", "read", "write"],
+    "_source": ["@timestamp", "filename", "host", "server", "read", "write"],
     "query": {
         "bool": {
             "filter": [
@@ -125,15 +125,16 @@ def main():
                 timestamp = hit.get('@timestamp', 'N/A')
                 filename = hit.get('filename', 'N/A')
                 ipv6host = hit.get('host', 'N/A')
+                server = hit.get('server', 'N/A')
+
                 host = convert_ipv6_to_ipv4(ipv6host)
                 if host == None:
                     host = ipv6host
 
-                print(host)
                 read = str(hit.get('read', 'N/A'))
                 write = str(hit.get('write', 'N/A'))
     
-                content = f"[{timestamp}] [Objectname:{filename}] [Host:{host}] [Read:{read}] [Write:{write}]\n"
+                content = f"[{timestamp}] [Objectname:{filename}] [Host:{host}] [Server:{server}] [Read:{read}] [Write:{write}]\n"
 
                 write_to_files([f1, f2], content)
 
