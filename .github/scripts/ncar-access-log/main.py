@@ -23,44 +23,32 @@ query = {
                         }
                     }
                 },
+             ],
+            "should": [
                 {
-                    "bool": {
-                        "should": [
-                            {
-                                "wildcard": {
-                                    "filename": {
-                                        "value": "*ncar*"
-                                    }
-                                }
-                            },
-                            {
-                                "wildcard": {
-                                    "filename": {
-                                        "value": "*ncar-rda*"
-                                    }
-                                }
-                            },
-                            {
-                                "wildcard": {
-                                    "filename": {
-                                        "value": "*ncar-rda-test*"
-                                    }
-                                }
-                            },
-                            {
-                                "wildcard": {
-                                    "filename": {
-                                        "value": "*ncar-cesm2-lens*"
-                                    }
-                                }
-                            },
-                        ],
-                        "minimum_should_match": 1
+                    "match_phrase": {
+                        "filename": "ncar/"
+                    }
+                },
+                {
+                    "match_phrase": {
+                        "filename": "ncar-rda/"
+                    }
+                },
+                {
+                    "match_phrase": {
+                        "filename": "ncar-rda-test/"
+                    }
+                },
+                {
+                    "match_phrase": {
+                        "filename": "ncar-cesm2-lens/"
                     }
                 }
-            ]
+            ],
+            "minimum_should_match": 1  # Ensures at least one match is required
         }
-    },
+    }
 }
 
 def convert_ipv6_to_ipv4(ipv6_str):
