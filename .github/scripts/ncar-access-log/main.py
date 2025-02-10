@@ -63,31 +63,18 @@ query = {
     },
 }
 
-def convert_ipv6_to_ipv4(ipv6_str):
-    try:
-        if ipv6_str[0] == "[":
-            ipv6_str = ipv6_str[1:]
+def ipv_cleanup(host_str):
+    if host_str[0] == "[":
+        host_str = host_str[1:]
         
-        if ipv6_str[-1] == "]":
-            ipv6_str = ipv6_str[:len(ipv6_str)-1]
-        # Convert the string to an IPv6 address object
+    if host_str[-1] == "]":
+        host_str = host_str[:len(host_str)-1]
+    # Convert the string to an IPv6 address object
 
-        if ipv6_str.startswith("::"):
-            ipv6_str = ipv6_str[2:]
-
-        split = ipv6_str.split(":", 1)
-
-        if len(split) > 1:
-            ipv6_str = split[1]
-
-        ipv6 = ipaddress.IPv6Address(ipv6_str)
-        # Check if it's an embedded IPv4 address
-        if ipv6.ipv4_mapped:
-            return str(ipv6.ipv4_mapped)  # Return the embedded IPv4 address
-        else:
-            return ipv6_str 
-    except ValueError:
-        return ipv6_str 
+    if host_str.startswith("::"):
+        host_str = host_str[2:]
+        
+    return host_str 
 
 
 def print_error(d, depth=0):
@@ -124,12 +111,12 @@ def main():
                 hit = src['_source']
                 timestamp = hit.get('@timestamp', 'N/A')
                 filename = hit.get('filename', 'N/A')
-                ipv6host = hit.get('host', 'N/A')
+                host_str = hit.get('host', 'N/A')
                 server = hit.get('server', 'N/A')
 
-                host = convert_ipv6_to_ipv4(ipv6host)
+                host = ipv_cleanup(host_str)
                 if host == None:
-                    host = ipv6host
+                    host = host_str
 
                 read = str(hit.get('read', 'N/A'))
                 write = str(hit.get('write', 'N/A'))
