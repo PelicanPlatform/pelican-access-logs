@@ -10,19 +10,36 @@ on:
   # Allow manual triggering via GitHub UI
   workflow_dispatch:
 
+
 jobs:
   accesses:
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-python@v5
-      with:
-        python-version: '3.9'
-        cache: 'pip'
-    - run: pip install -r .github/scripts/ncar-access-log/requirements.txt
-    - run: python .github/scripts/ncar-access-log/main.py
-    - uses: stefanzweifel/git-auto-commit-action@v4
+      - uses: actions/checkout@v4
 
+      - name: Install Git LFS
+        run: |
+          sudo apt-get update
+          sudo apt-get install git-lfs
+          git lfs install
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+          cache: 'pip'
+
+      - run: pip install -r .github/scripts/ncar-access-log/requirements.txt
+      - run: python .github/scripts/ncar-access-log/main.py
+
+      - name: Track large files with Git LFS
+        run: |
+          git lfs track "*.log"
+          git add .gitattributes
+
+      - uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: "Add daily access logs"
 
