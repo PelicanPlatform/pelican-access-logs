@@ -1,56 +1,152 @@
 from datetime import date
 import time
 import requests
-
+import math
 from opensearchpy import OpenSearch
 
-TIMEOUT = 300
+TIMEOUT = 3600  # Increased from 300 to 3600 (1 hour)
 
 HOST = "https://gracc.opensciencegrid.org/q"
 INDEX = "xrd-stash*"
 DATA_PATH = "ncar-access-log"
 
-query = {
-    "size": 1000,
+# Query for non-NCAR_OSDF_ORIGIN entries
+non_origin_query = {
+    "size": 10000,
     "_source": ["@timestamp", "filename", "host", "server", "read", "write", "operation_time", "site", "appinfo"],
     "query": {
         "bool": {
+            "must": [
+                {
+                    "bool": {
+                        "should": [
+                            {
+                                "match_phrase": {
+                                    "filename": "ncar/"
+                                }
+                            },
+                            {
+                                "match_phrase": {
+                                    "filename": "ncar-rda/"
+                                }
+                            },
+                            {
+                                "match_phrase": {
+                                    "filename": "ncar-rda-test/"
+                                }
+                            },
+                            {
+                                "match_phrase": {
+                                    "filename": "ncar-cesm2-lens/"
+                                }
+                            }
+                        ],
+                        "minimum_should_match": 1
+                    }
+                }
+            ],
             "filter": [
                 {
                     "range": {
                         "@timestamp": {
-                            "gte": "now-7d/d",
-                            "lte": "now/d"
+                            "gte": "now-1d/d",
+                            "lte": "now"
                         }
                     }
                 },
-             ],
-            "should": [
                 {
-                    "match_phrase": {
-                        "filename": "ncar/"
-                    }
-                },
-                {
-                    "match_phrase": {
-                        "filename": "ncar-rda/"
-                    }
-                },
-                {
-                    "match_phrase": {
-                        "filename": "ncar-rda-test/"
-                    }
-                },
-                {
-                    "match_phrase": {
-                        "filename": "ncar-cesm2-lens/"
+                    "bool": {
+                        "must_not": [
+                            {
+                                "term": {
+                                    "site.keyword": "NCAR_OSDF_ORIGIN"
+                                }
+                            }
+                        ]
                     }
                 }
-            ],
-            "minimum_should_match": 1  # Ensures at least one match is required
+            ]
         }
     }
 }
+
+# Query for aggregated NCAR_OSDF_ORIGIN entries
+def build_origin_composite_query(after_key=None):
+    """
+    Constructs the composite aggregation query for NCAR_OSDF_ORIGIN entries.
+
+    Args:
+        after_key (dict or None): Optional after_key for pagination.
+
+    Returns:
+        dict: Elasticsearch/OpenSearch query body.
+    """
+    composite_body = {
+        "size": 0,
+        "query": {
+            "bool": {
+                "must": [
+                    {"term": {"site.keyword": "NCAR_OSDF_ORIGIN"}},
+                    {"exists": {"field": "filename"}},
+                    {
+                        "bool": {
+                            "must_not": [
+                                {"term": {"filename.keyword": ""}},
+                                {"term": {"filename.keyword": "missing directory"}}
+                            ]
+                        }
+                    }
+                ],
+                "filter": [
+                    {
+                        "range": {
+                            "@timestamp": {
+                                "gte": "now-1d/d",
+                                "lte": "now"
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        "aggs": {
+            "composite_buckets": {
+                "composite": {
+                    "size": 500,
+                    "sources": [
+                        {
+                            "interval": {
+                                "date_histogram": {
+                                    "field": "@timestamp",
+                                    "fixed_interval": "5m"
+                                }
+                            }
+                        },
+                        {
+                            "filename": {
+                                "terms": {
+                                    "field": "filename.keyword"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "aggs": {
+                    "total_read": {"sum": {"field": "read"}},
+                    "total_write": {"sum": {"field": "write"}},
+                    "total_operation_time": {"sum": {"field": "operation_time"}},
+                    "count": {"value_count": {"field": "site.keyword"}}
+                }
+            }
+        }
+    }
+
+    if after_key:
+        composite_body["aggs"]["composite_buckets"]["composite"]["after"] = after_key
+
+    return composite_body
+
+
 
 def parse_server_response(retries=3, delay=5):
     """
@@ -145,27 +241,87 @@ def write_to_files(files, content):
         except IOError as e:
             print(f"Error writing to file {f.name}: {e}")
 
+
+def estimate_composite_bucket_count(client):
+    """
+    Estimates the number of unique (5-minute interval, filename) pairs
+    using a cardinality aggregation with a scripted key.
+    """
+    query = {
+        "size": 0,
+        "query": {
+            "bool": {
+                "must": [
+                    {"term": {"site.keyword": "NCAR_OSDF_ORIGIN"}},
+                    {"exists": {"field": "filename"}},
+                    {
+                        "bool": {
+                            "must_not": [
+                                {"term": {"filename.keyword": ""}},
+                                {"term": {"filename.keyword": "missing directory"}}
+                            ]
+                        }
+                    }
+                ],
+                "filter": [
+                    {
+                        "range": {
+                            "@timestamp": {
+                                "gte": "now-1d/d",
+                                "lte": "now/d"
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        "aggs": {
+            "unique_pairs": {
+                "cardinality": {
+                    "script": {
+                        # Round timestamp to 5-minute buckets and combine with filename
+                        "source": "doc['filename.keyword'].value + '|' + (doc['@timestamp'].value.toInstant().toEpochMilli() / 300000)",
+                        "lang": "painless"
+                    }
+                }
+            }
+        }
+    }
+
+    response = client.search(
+        body=query,
+        index=INDEX,
+        request_timeout=TIMEOUT
+    )
+
+    return response["aggregations"]["unique_pairs"]["value"]
+
 def main():
-    client = OpenSearch(hosts=[HOST], request_timeout=TIMEOUT,)
+    client = OpenSearch(hosts=[HOST], request_timeout=3600, timeout=3600)  # Increased from 120 to 3600 (1 hour)
     
-    with open(f"{DATA_PATH}/latest.log", "w") as f1, open(f"{DATA_PATH}/{date.today()}.log", "w") as f2:
+    # Open files for cache entries
+    with open(f"{DATA_PATH}/latest-cache.log", "w") as f1_cache, open(f"{DATA_PATH}/{date.today()}-cache.log", "w") as f2_cache:
         try:
-            # Initialize the scroll
+            # First get non-NCAR_OSDF_ORIGIN entries
+            print("Processing non-NCAR_OSDF_ORIGIN entries...")
             response = client.search(
-                body=query,
+                body=non_origin_query,
                 index=INDEX,
-                scroll="2m",  # Keep the scroll context alive for 2 minutes
-                size=1000     # Number of entries per batch
+                scroll="1h",
+                size=10000
             )
-            scroll_id = response["_scroll_id"]  # Get the scroll ID
-            total_hits = response["hits"]["total"]["value"]  # Total number of hits
-            print(f"Total hits: {total_hits}")
+            scroll_id = response["_scroll_id"]
+            total_hits = response["hits"]["total"]["value"]
+            print(f"Total non-NCAR_OSDF_ORIGIN hits: {total_hits}")
+
+            total_batches = math.ceil(total_hits/10000)
+            print(f"Total batches: {total_batches}")
 
             servers = parse_server_response()
 
             batch_count = 1
             while True:
-                print(f"Processing batch {batch_count}...")
+                print(f"Processing batch {batch_count} of {total_batches}...")
                 for src in response['hits']['hits']:
                     hit = src['_source']
                     timestamp = hit.get('@timestamp', 'N/A')
@@ -193,16 +349,18 @@ def main():
 
                     geoip = f"[Latitude:{latitude}] [Longitude:{longitude}]"
 
-    
-                    content = f"[{timestamp}] [Objectname:{filename}] [Site:{site}] [Host:{host}] [Server:{server}]  {server_type} {geoip} [AppInfo:{appinfo}] [PelicanClient:{p_client}] [Read:{read}] [Write:{write}] [OpTime:{operation_time}s]\n"
+                    content = f"[{timestamp}] [Objectname:{filename}] [Site:{site}] [Host:{host}] [Server:{server}] {server_type} {geoip} [AppInfo:{appinfo}] [PelicanClient:{p_client}] [Read:{read}] [Write:{write}] [OpTime:{operation_time}s]\n"
 
-                    write_to_files([f1, f2], content)
+                    write_to_files([f1_cache, f2_cache], content)
 
-                response = client.scroll(scroll_id=scroll_id, scroll="2m")  # Get the next batch of results
+                response = client.scroll(scroll_id=scroll_id, scroll="1h")
                 if not response["hits"]["hits"]:
                     break
 
                 batch_count += 1
+
+            # Clear the scroll context
+            client.clear_scroll(scroll_id=scroll_id)
 
         except KeyboardInterrupt:
             print("Process interrupted by user.")
@@ -215,10 +373,80 @@ def main():
             else:
                 print("Error info not available or not in expected format.")
                 raise err
-        finally:
-            if "scoll_id" in locals():
-                client.clear_scroll(scroll_id=scroll_id)
 
+
+    
+    # Open files for origin entries
+    with open(f"{DATA_PATH}/latest-origin.log", "w") as f1_origin, open(f"{DATA_PATH}/{date.today()}-origin.log", "w") as f2_origin:
+        # Then get aggregated NCAR_OSDF_ORIGIN entries
+        print("\nProcessing aggregated NCAR_OSDF_ORIGIN entries...")
+        try:
+            print("\nEstimating number of composite buckets...")
+            estimated_total_buckets = estimate_composite_bucket_count(client)
+            estimated_pages = (estimated_total_buckets + 499) // 500
+            print(f"Estimated total buckets: {estimated_total_buckets}")
+            print(f"Estimated pages to fetch (size=500): {estimated_pages}")
+
+            after_key = None
+            current_page=1
+
+
+            while True:
+                print(f"\nFetching composite page {current_page} of ~{estimated_pages}...")
+
+                composite_query = build_origin_composite_query(after_key)
+                response = client.search(
+                    body=composite_query,
+                    index=INDEX,
+                    request_timeout=3600  # Increased from 120 to 3600 (1 hour)
+                )
+            
+                if 'aggregations' not in response:
+                    print("No aggregations found in response")
+                    print("Response keys:", response.keys())
+                    return
+
+
+                buckets = response["aggregations"]["composite_buckets"]["buckets"]
+                print(f"Fetched {len(buckets)} buckets")
+
+                for bucket in buckets:
+                    key = bucket["key"]
+                    filename = key["filename"]
+                    timestamp = key["interval"]
+                    total_read = bucket["total_read"]["value"]
+                    total_write = bucket["total_write"]["value"]
+                    total_operation_time = bucket["total_operation_time"]["value"]
+                    count = bucket["count"]["value"]
+
+                    server_type = "[ServerType:origin]"
+                    content = f"[{timestamp}] [Objectname:{filename}] [Site:NCAR_OSDF_ORIGIN] {server_type} [Read:{total_read}] [Write:{total_write}] [OpTime:{total_operation_time}s] [Count:{count}]\n"
+
+                    write_to_files([f1_origin, f2_origin], content)
+
+                after_key = response["aggregations"]["composite_buckets"].get("after_key")
+                if not after_key:
+                    break
+
+                current_page += 1
+        
+        except Exception as search_err:
+            print(f"Error in search query: {search_err}")
+            if hasattr(search_err, 'info') and isinstance(search_err.info, dict):
+                print_error(search_err.info)
+            raise search_err
+
+        except KeyboardInterrupt:
+            print("Process interrupted by user.")
+            pass
+
+        except Exception as err:
+            print(f"Error: {err}")
+            if hasattr(err, 'info') and isinstance(err.info, dict):
+                print_error(err.info)
+            else:
+                print("Error info not available or not in expected format.")
+                raise err
 
 if __name__ == "__main__":
     main()
