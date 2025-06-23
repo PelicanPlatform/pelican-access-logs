@@ -5,7 +5,7 @@ name: Access Log
 on:
   schedule:
     # Runs at midnight (00:00) UTC every Sunday
-    - cron: "0 0 * * SUN"
+    - cron: "0 0 * * *"
   
   # Allow manual triggering via GitHub UI
   workflow_dispatch:
