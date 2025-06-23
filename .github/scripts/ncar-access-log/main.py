@@ -49,7 +49,7 @@ non_origin_query = {
                 {
                     "range": {
                         "@timestamp": {
-                            "gte": "now-1d/d",
+                            "gte": "now-7d/d",
                             "lte": "now"
                         }
                     }
@@ -101,7 +101,7 @@ def build_origin_composite_query(after_key=None):
                     {
                         "range": {
                             "@timestamp": {
-                                "gte": "now-1d/d",
+                                "gte": "now-7d/d",
                                 "lte": "now"
                             }
                         }
@@ -267,7 +267,7 @@ def estimate_composite_bucket_count(client):
                     {
                         "range": {
                             "@timestamp": {
-                                "gte": "now-1d/d",
+                                "gte": "now-7d/d",
                                 "lte": "now/d"
                             }
                         }
