@@ -34,15 +34,6 @@ jobs:
           sudo apt-get install git-lfs
           git lfs install
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.9'
-          cache: 'pip'
-
-      - run: pip install -r .github/scripts/ncar-access-log/requirements.txt
-      - run: python .github/scripts/ncar-access-log/main.py
-
       - name: Track large files with Git LFS
         run: |
           git lfs track "*.log"
