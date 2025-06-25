@@ -3,6 +3,8 @@ import time
 import requests
 import math
 from opensearchpy import OpenSearch
+import argparse
+from datetime import datetime, timedelta
 
 TIMEOUT = 3600  # Increased from 300 to 3600 (1 hour)
 
@@ -11,7 +13,8 @@ INDEX = "xrd-stash*"
 DATA_PATH = "ncar-access-log"
 
 # Query for non-NCAR_OSDF_ORIGIN entries
-non_origin_query = {
+def build_non_origin_query(start_date, end_date):
+    non_origin_query = {
     "size": 10000,
     "_source": ["@timestamp", "filename", "host", "server", "read", "write", "operation_time", "site", "appinfo"],
     "query": {
@@ -49,8 +52,8 @@ non_origin_query = {
                 {
                     "range": {
                         "@timestamp": {
-                            "gte": "now-7d/d",
-                            "lte": "now"
+                            "gte": start_date,
+                            "lte": end_date
                         }
                     }
                 },
@@ -68,10 +71,12 @@ non_origin_query = {
             ]
         }
     }
-}
+    }
+
+    return non_origin_query
 
 # Query for aggregated NCAR_OSDF_ORIGIN entries
-def build_origin_composite_query(after_key=None):
+def build_origin_composite_query(start_date, end_date, after_key=None):
     """
     Constructs the composite aggregation query for NCAR_OSDF_ORIGIN entries.
 
@@ -101,8 +106,8 @@ def build_origin_composite_query(after_key=None):
                     {
                         "range": {
                             "@timestamp": {
-                                "gte": "now-7d/d",
-                                "lte": "now"
+                                "gte": start_date,
+                                "lte": end_date
                             }
                         }
                     }
@@ -242,7 +247,7 @@ def write_to_files(files, content):
             print(f"Error writing to file {f.name}: {e}")
 
 
-def estimate_composite_bucket_count(client):
+def estimate_composite_bucket_count(client, start_date, end_date):
     """
     Estimates the number of unique (5-minute interval, filename) pairs
     using a cardinality aggregation with a scripted key.
@@ -267,8 +272,8 @@ def estimate_composite_bucket_count(client):
                     {
                         "range": {
                             "@timestamp": {
-                                "gte": "now-7d/d",
-                                "lte": "now/d"
+                                "gte": start_date,
+                                "lte": end_date
                             }
                         }
                     }
@@ -297,13 +302,24 @@ def estimate_composite_bucket_count(client):
     return response["aggregations"]["unique_pairs"]["value"]
 
 def main():
+    parser = argparse.ArgumentParser(description='Process some integers.')
+    parser.add_argument('--date', type=str, required=True, help='Date to run the script for')
+    args = parser.parse_args()
+
+    # Convert to datetime
+    target_date = datetime.strptime(args.date, "%Y-%m-%d")
+    start_date = (target_date - timedelta(days=1)).strftime("%Y-%m-%dT00:00:00Z")
+    end_date = target_date.strftime("%Y-%m-%dT00:00:00Z")
+
+
     client = OpenSearch(hosts=[HOST], request_timeout=3600, timeout=3600)  # Increased from 120 to 3600 (1 hour)
     
     # Open files for cache entries
-    with open(f"{DATA_PATH}/latest-cache.log", "w") as f1_cache, open(f"{DATA_PATH}/{date.today()}-cache.log", "w") as f2_cache:
+    with open(f"{DATA_PATH}/latest-cache.log", "w") as f1_cache, open(f"{DATA_PATH}/{args.date}-cache.log", "w") as f2_cache:
         try:
             # First get non-NCAR_OSDF_ORIGIN entries
             print("Processing non-NCAR_OSDF_ORIGIN entries...")
+            non_origin_query = build_non_origin_query(start_date, end_date)
             response = client.search(
                 body=non_origin_query,
                 index=INDEX,
@@ -377,12 +393,12 @@ def main():
 
     
     # Open files for origin entries
-    with open(f"{DATA_PATH}/latest-origin.log", "w") as f1_origin, open(f"{DATA_PATH}/{date.today()}-origin.log", "w") as f2_origin:
+    with open(f"{DATA_PATH}/latest-origin.log", "w") as f1_origin, open(f"{DATA_PATH}/{args.date}-origin.log", "w") as f2_origin:
         # Then get aggregated NCAR_OSDF_ORIGIN entries
         print("\nProcessing aggregated NCAR_OSDF_ORIGIN entries...")
         try:
             print("\nEstimating number of composite buckets...")
-            estimated_total_buckets = estimate_composite_bucket_count(client)
+            estimated_total_buckets = estimate_composite_bucket_count(client, start_date, end_date)
             estimated_pages = (estimated_total_buckets + 499) // 500
             print(f"Estimated total buckets: {estimated_total_buckets}")
             print(f"Estimated pages to fetch (size=500): {estimated_pages}")
@@ -394,7 +410,7 @@ def main():
             while True:
                 print(f"\nFetching composite page {current_page} of ~{estimated_pages}...")
 
-                composite_query = build_origin_composite_query(after_key)
+                composite_query = build_origin_composite_query(start_date, end_date, after_key)
                 response = client.search(
                     body=composite_query,
                     index=INDEX,

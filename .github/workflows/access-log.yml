@@ -2,13 +2,15 @@
 
 name: Access Log
 
-on:
-  schedule:
-    # Runs at midnight (00:00) UTC every Sunday
-    - cron: "0 0 * * SUN"
-  
+on: 
   # Allow manual triggering via GitHub UI
   workflow_dispatch:
+    inputs:
+      date:
+        description: "Date to run the script for"
+        required: true
+        default: "2025-06-25"
+
 
 
 jobs:
@@ -18,6 +20,13 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+          cache: 'pip'
+      - run: pip install -r .github/scripts/ncar-access-log/requirements.txt
+      - run: python .github/scripts/ncar-access-log/main.py --date ${{ github.event.inputs.date }}
+      - uses: stefanzweifel/git-auto-commit-action@v4
 
       - name: Install Git LFS
         run: |
@@ -41,5 +50,5 @@ jobs:
 
       - uses: stefanzweifel/git-auto-commit-action@v4
         with:
-          commit_message: "Add weekly access logs"
+          commit_message: "Add daily access logs"
 
