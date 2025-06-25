@@ -33,6 +33,11 @@ jobs:
           sudo apt-get install git-lfs
           git lfs install
 
+      - name: Cleanup after job
+        run: |
+          rm -rf logs/ temp/
+          df -h
+
       - name: Track large files with Git LFS
         run: |
           git lfs track "*.log"
