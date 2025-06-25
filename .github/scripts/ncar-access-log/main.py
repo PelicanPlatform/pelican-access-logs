@@ -308,7 +308,7 @@ def main():
 
     # Convert to datetime
     target_date = datetime.strptime(args.date, "%Y-%m-%d")
-    start_date = (target_date - timedelta(days=1)).strftime("%Y-%m-%dT00:00:00Z")
+    start_date = (target_date - timedelta(days=7)).strftime("%Y-%m-%dT00:00:00Z")
     end_date = target_date.strftime("%Y-%m-%dT00:00:00Z")
 
 
