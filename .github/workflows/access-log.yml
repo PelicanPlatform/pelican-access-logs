@@ -41,5 +41,5 @@ jobs:
 
       - uses: stefanzweifel/git-auto-commit-action@v4
         with:
-          commit_message: "Add daily access logs"
+          commit_message: "Add weekly access logs"
 
