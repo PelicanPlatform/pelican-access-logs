@@ -25,6 +25,13 @@ jobs:
           python-version: '3.9'
           cache: 'pip'
       - run: pip install -r .github/scripts/ncar-access-log/requirements.txt
+
+      - name: Force disable debug
+        run: echo "Debug off"
+        env:
+          ACTIONS_STEP_DEBUG: false
+          ACTIONS_RUNNER_DEBUG: false
+          
       - run: python .github/scripts/ncar-access-log/main.py --date ${{ github.event.inputs.date }}
 
       - name: Install Git LFS
