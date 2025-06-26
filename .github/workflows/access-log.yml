@@ -42,12 +42,13 @@ jobs:
 
       - name: Cleanup after job
         run: |
-          rm -rf logs/ temp/
+          rm -rf logs/ temp/ *utc.log
           df -h
 
       - name: Track large files with Git LFS
         run: |
-          git lfs track "*.log"
+          git lfs track "*cache.log"
+          git lfs track "*origin.log"
           git add .gitattributes
 
       - uses: stefanzweifel/git-auto-commit-action@v4
