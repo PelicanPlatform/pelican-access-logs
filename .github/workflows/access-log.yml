@@ -1,9 +1,6 @@
-# Runs the python script to create the access log for the database
-
 name: Access Log
 
 on: 
-  # Allow manual triggering via GitHub UI
   workflow_dispatch:
     inputs:
       date:
@@ -11,19 +8,25 @@ on:
         required: true
         default: "2025-06-25"
 
-
-
 jobs:
   accesses:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout repo with full history
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0  # Needed to allow pulling/rebasing
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.9'
           cache: 'pip'
+
       - run: pip install -r .github/scripts/ncar-access-log/requirements.txt
 
       - name: Force disable debug
@@ -31,8 +34,9 @@ jobs:
         env:
           ACTIONS_STEP_DEBUG: false
           ACTIONS_RUNNER_DEBUG: false
-          
-      - run: python .github/scripts/ncar-access-log/main.py --date ${{ github.event.inputs.date }}
+
+      - name: Run access log script
+        run: python .github/scripts/ncar-access-log/main.py --date ${{ github.event.inputs.date }}
 
       - name: Install Git LFS
         run: |
@@ -40,18 +44,38 @@ jobs:
           sudo apt-get install git-lfs
           git lfs install
 
-      - name: Cleanup after job
-        run: |
-          rm -rf logs/ temp/ *utc.log
-          df -h
-
       - name: Track large files with Git LFS
         run: |
           git lfs track "*cache.log"
           git lfs track "*origin.log"
           git add .gitattributes
 
+<<<<<<< HEAD
       - uses: stefanzweifel/git-auto-commit-action@v4
         with:
           commit_message: "Add daily access logs"
+=======
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+>>>>>>> 31cd63c (Should now be able to run multiple versions simultaneously)
 
+      - name: Commit changes
+        run: |
+          git add .
+          git commit -m "Add backfilled daily access logs" || echo "No changes to commit"
+
+      - name: Pull with rebase and push
+        run: |
+          for i in {1..5}; do
+            git pull --rebase origin ${{ github.ref_name }} && \
+            git push origin ${{ github.ref_name }} && break
+            echo "Retrying push after 5 seconds..."
+            sleep 5
+          done
+
+      - name: Cleanup after job
+        run: |
+          rm -rf logs/ temp/ *utc.log
+          df -h
