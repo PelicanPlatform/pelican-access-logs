@@ -315,7 +315,7 @@ def main():
     client = OpenSearch(hosts=[HOST], request_timeout=3600, timeout=3600)  # Increased from 120 to 3600 (1 hour)
     
     # Open files for cache entries
-    with open(f"{DATA_PATH}/{args.date}-cache.log", "w") as f2_cache:
+    with open(f"{DATA_PATH}/latest-cache.log", "w") as f1_cache, open(f"{DATA_PATH}/{args.date}-cache.log", "w") as f2_cache:
         try:
             # First get non-NCAR_OSDF_ORIGIN entries
             print("Processing non-NCAR_OSDF_ORIGIN entries...")
@@ -367,7 +367,7 @@ def main():
 
                     content = f"[{timestamp}] [Objectname:{filename}] [Site:{site}] [Host:{host}] [Server:{server}] {server_type} {geoip} [AppInfo:{appinfo}] [PelicanClient:{p_client}] [Read:{read}] [Write:{write}] [OpTime:{operation_time}s]\n"
 
-                    write_to_files([f2_cache], content)
+                    write_to_files([f1_cache, f2_cache], content)
 
                 response = client.scroll(scroll_id=scroll_id, scroll="1h")
                 if not response["hits"]["hits"]:
@@ -393,7 +393,7 @@ def main():
 
     
     # Open files for origin entries
-    with open(f"{DATA_PATH}/{args.date}-origin.log", "w") as f2_origin:
+    with open(f"{DATA_PATH}/latest-origin.log", "w") as f1_origin, open(f"{DATA_PATH}/{args.date}-origin.log", "w") as f2_origin:
         # Then get aggregated NCAR_OSDF_ORIGIN entries
         print("\nProcessing aggregated NCAR_OSDF_ORIGIN entries...")
         try:
@@ -438,7 +438,7 @@ def main():
                     server_type = "[ServerType:origin]"
                     content = f"[{timestamp}] [Objectname:{filename}] [Site:NCAR_OSDF_ORIGIN] {server_type} [Read:{total_read}] [Write:{total_write}] [OpTime:{total_operation_time}s] [Count:{count}]\n"
 
-                    write_to_files([f2_origin], content)
+                    write_to_files([f1_origin, f2_origin], content)
 
                 after_key = response["aggregations"]["composite_buckets"].get("after_key")
                 if not after_key:
