@@ -49,18 +49,6 @@ jobs:
       - name: Run access log script
         run: python .github/scripts/ncar-access-log/main.py --date ${{ steps.set-date.outputs.date }}
 
-      - name: Install Git LFS
-        run: |
-          sudo apt-get update
-          sudo apt-get install git-lfs
-          git lfs install
-
-      - name: Track large files with Git LFS
-        run: |
-          git lfs track "*cache.log"
-          git lfs track "*origin.log"
-          git add .gitattributes
-
       - name: Configure Git
         run: |
           git config user.name "github-actions[bot]"
