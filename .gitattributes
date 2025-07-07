@@ -1,3 +1,0 @@
-*.log filter=lfs diff=lfs merge=lfs -text
-*cache.log filter=lfs diff=lfs merge=lfs -text
-*origin.log filter=lfs diff=lfs merge=lfs -text
