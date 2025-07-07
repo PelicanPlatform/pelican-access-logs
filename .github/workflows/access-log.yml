@@ -54,6 +54,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+      - name: Compress access logx with xz
+        run: |
+          find . -type f -name '*.log' -exec xz -9 -T0 {} \;
+
       - name: Commit changes
         run: |
           git add .
