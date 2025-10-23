@@ -37,17 +37,8 @@ jobs:
           ACTIONS_STEP_DEBUG: false
           ACTIONS_RUNNER_DEBUG: false
 
-      - name: Set date input
-        id: set-date
-        run: |
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            echo "date=$(date -u +%F)" >> "$GITHUB_OUTPUT"
-          else
-            echo "date=${{ github.event.inputs.date }}" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Run access log script
-        run: python .github/scripts/ncar-access-log/main.py --date ${{ steps.set-date.outputs.date }}
+        run: python .github/scripts/ncar-access-log/main.py --date ${{ github.event.inputs.date }}
 
       - name: Configure Git
         run: |
@@ -61,7 +52,7 @@ jobs:
       - name: Commit changes
         run: |
           git add .
-          git commit -m "Add daily access logs" || echo "No changes to commit"
+          git commit -m "Add backfilled daily access logs" || echo "No changes to commit"
 
       - name: Pull with rebase and push
         run: |
