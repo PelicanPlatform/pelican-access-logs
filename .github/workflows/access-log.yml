@@ -56,7 +56,7 @@ jobs:
 
       - name: Compress access logx with xz
         run: |
-          find . -type f -name '*.log' -exec xz -9 -T0 {} \;
+          find . -type f -name '*.log' -exec xz -9 -T0 -f {} \;
 
       - name: Commit changes
         run: |
