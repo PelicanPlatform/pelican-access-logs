@@ -37,7 +37,7 @@ def build_non_origin_query(start_date, end_date):
                                 "match_phrase": {
                                     "filename": "ncar-gdex/"
                                 }
-                            }
+                            },
                             {
                                 "match_phrase": {
                                     "filename": "ncar-rda-test/"
