@@ -6,7 +6,7 @@ namespace (per-collector paths such as `route-views6/` live beneath it).
 Tthis dataset is emitted as **JSONL**
 — one JSON object per line — which is easy to ingest and to query ad-hoc with `jq`.
 
-The workflow runs daily at 00:00:00 UTC and contains accesses from the previous day.
+The workflow runs daily at 00:30 UTC and contains accesses from the previous (UTC) day.
 There are two streams:
 
 - **Cache** — per-access records for non-origin sites: `latest-cache.jsonl` (rolling) and
@@ -30,7 +30,7 @@ curl -s https://pelicanplatform.github.io/pelican-access-logs/routeviews-access-
 | `timestamp` | int | Epoch **milliseconds** of the access |
 | `object_name` | string | Object path |
 | `site` | string | OSDF site name |
-| `remote_ip` | string \| null | Client IP (`null` when not recorded) |
+| `remote_ip` | string \| null | Client IP (IPv4 or IPv6); may be the string `unknown`, or `null`, when the source didn't record it |
 | `server` | string | Serving host |
 | `server_type` | string | `cache`, `origin`, or `unknown` |
 | `latitude` | float | Server latitude (0 if unknown) |
@@ -43,7 +43,7 @@ curl -s https://pelicanplatform.github.io/pelican-access-logs/routeviews-access-
 
 Example:
 ```json
-{"timestamp":1751843559026,"object_name":"/route-views6/bgpdata/2026.07/UPDATES/updates.20260701.1600.bz2","site":"AMST_INTERNET2_OSDF_CACHE","remote_ip":"84.88.185.81","server":"127.0.0.1","server_type":"cache","latitude":52.17,"longitude":4.4728,"appinfo":"Python-urllib/3.12","pelican_client":false,"bytes_sent":2634022912,"bytes_rcvd":0,"op_time":55621}
+{"timestamp":1784832966873,"object_name":"/routeviews/route-views.chicago/bgpdata/2025.03/RIBS/rib.20250319.0400.bz2","site":"Stashcache-Chicago","remote_ip":"2607:f388:2200:b8:9445:e586:f602:6945","server":"127.0.0.1","server_type":"cache","latitude":41.8882,"longitude":-87.6164,"appinfo":"pelican-client/7.25.0","pelican_client":true,"bytes_sent":8388608,"bytes_rcvd":0,"op_time":3082251}
 ```
 
 ### Origin record (aggregated, five-minute buckets)
@@ -60,7 +60,7 @@ Example:
 
 Example:
 ```json
-{"timestamp":1751760000000,"object_name":"/routeviews/route-views6/bgpdata/...","site":"KENNESAW_OSSTORE_PUBLIC","server_type":"origin","bytes_sent":24248320,"bytes_rcvd":0,"op_time":0,"count":185}
+{"timestamp":1784811900000,"object_name":"/routeviews/route-views7/bgpdata/2026.07/RIBS/rib.20260723.0000.bz2","site":"KENNESAW_OSSTORE_PUBLIC","server_type":"origin","bytes_sent":81333713,"bytes_rcvd":0,"op_time":1357191295,"count":621}
 ```
 
 ## Notes
