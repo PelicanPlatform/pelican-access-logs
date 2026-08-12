@@ -1,0 +1,79 @@
+# Adapted from access-log.yml (the NCAR access-log workflow).
+# Produces the RouteViews access-log dataset as JSONL under routeviews-access-log/.
+name: RouteViews Access Log
+
+on:
+  schedule:
+    - cron: '30 0 * * *'  # Runs daily at 00:30 UTC (offset from the NCAR job at 00:00);
+                          # still queries the full previous UTC day, which is keyed to the date, not the run time
+  workflow_dispatch:     # Keeps manual trigger with date input
+    inputs:
+      date:
+        description: "Date to run the script for"
+        required: true
+        default: "2025-06-25"
+
+jobs:
+  accesses:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repo with full history
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+          cache: 'pip'
+
+      - run: pip install -r .github/scripts/routeviews-access-log/requirements.txt
+
+      - name: Force disable debug
+        run: echo "Debug off"
+        env:
+          ACTIONS_STEP_DEBUG: false
+          ACTIONS_RUNNER_DEBUG: false
+
+      - name: Set date input
+        id: set-date
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "date=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+          else
+            echo "date=${{ github.event.inputs.date }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run access log script and prepare files
+        run: python .github/scripts/routeviews-access-log/main.py --date ${{ steps.set-date.outputs.date }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      # Files are committed as raw .jsonl (no compression) so they can be queried directly
+      # with jq from the published URL. RouteViews volume is small enough that this is fine.
+      - name: Commit changes
+        run: |
+          git add routeviews-access-log
+          git commit -m "Add daily access logs" || echo "No changes to commit"
+
+      - name: Pull with rebase and push
+        run: |
+          for i in {1..5}; do
+            git pull --rebase origin ${{ github.ref_name }} && \
+            git push origin ${{ github.ref_name }} && break
+            echo "Retrying push after 5 seconds..."
+            sleep 5
+          done
+
+      - name: Cleanup after job
+        run: |
+          rm -rf logs/ temp/ *utc.log
+          df -h
